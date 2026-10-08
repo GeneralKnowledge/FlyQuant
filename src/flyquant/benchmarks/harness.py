@@ -279,13 +279,23 @@ class BenchmarkHarness:
             behaviour = behavioural_fidelity(ref_run.summary(), hyp_run.summary())
 
         resources = measure_resources()
+        # Ratio definitions (reported explicitly; never conflate file vs RAM):
+        # - graph methods: reference CSR bytes / stored artefact bytes
+        # - weight methods: reference wdata bytes / quantised payload (+meta) bytes
         compression_ratio = None
-        if variant_info.get("artefact_bytes"):
-            compression_ratio = model_bytes_ref / variant_info["artefact_bytes"]
+        weight_bytes_ref = int(weights_mv.astype(np.float32).nbytes)
+        variant_info["reference_weight_bytes_fp32"] = weight_bytes_ref
+        if method in ("fp16", "fp32", "int8", "int4") and variant_info.get("artefact_bytes"):
+            compression_ratio = weight_bytes_ref / variant_info["artefact_bytes"]
+            variant_info["compression_ratio_basis"] = "fp32_wdata_vs_quant_artefact"
         elif variant_info.get("graph_storage", {}).get("stored_nbytes"):
             compression_ratio = (
                 model_bytes_ref / variant_info["graph_storage"]["stored_nbytes"]
             )
+            variant_info["compression_ratio_basis"] = "csr_vs_lossless_artefact"
+        elif variant_info.get("artefact_bytes"):
+            compression_ratio = model_bytes_ref / variant_info["artefact_bytes"]
+            variant_info["compression_ratio_basis"] = "csr_vs_artefact"
 
         return {
             **meta,

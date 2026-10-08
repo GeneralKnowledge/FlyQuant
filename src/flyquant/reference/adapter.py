@@ -96,17 +96,22 @@ def load_reference_connectome(source: str = "auto", subgraph: str | None = None)
 
     if subgraph == "escape":
         seeds = c.by_cell_types(["LPLC2", "LC4", "DNp01"])["idx"].to_numpy()
-        keep: set[int] = set(int(i) for i in seeds)
+        seed_set = {int(i) for i in seeds}
+        keep: set[int] = set(seed_set)
         for i in seeds:
             row = c.w.getrow(int(i))
             keep.update(int(j) for j in row.indices)
             # one hop upstream into LC4/LPLC2 also helps density for short trials
             col = c.w.getcol(int(i)).tocoo()
             keep.update(int(j) for j in col.row[:200])
-        idx = np.array(sorted(keep), dtype=np.int64)
-        # Cap for CPU-only machines; still real FlyWire neurons/edges.
+        # Cap for CPU-only machines, but never drop seed circuit neurons.
+        # Taking sorted(keep)[:max_n] alone can exclude high-index DNp01 cells.
         max_n = int(os.environ.get("FLYQUANT_ESCAPE_SUBGRAPH_MAX", "4000"))
-        idx = idx[:max_n]
+        if len(keep) > max_n:
+            extras = sorted(keep - seed_set)
+            budget = max(0, max_n - len(seed_set))
+            keep = set(seed_set) | set(extras[:budget])
+        idx = np.array(sorted(keep), dtype=np.int64)
         c = c.subgraph(idx)
     elif subgraph is not None:
         raise ValueError(f"unknown subgraph: {subgraph}")
