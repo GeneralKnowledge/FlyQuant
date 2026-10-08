@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flyquant"
+version = "0.1.0"
+description = "LLM-style quantisation experiments for a connectome-based fruit fly brain model"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [{ name = "FlyQuant contributors" }]
+keywords = ["connectome", "quantisation", "drosophila", "LIF", "compression"]
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "pandas>=2.1",
+  "PyYAML>=6.0",
+  "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=4.0"]
+lab = [
+  "fastapi>=0.110",
+  "uvicorn>=0.25",
+  "websockets>=12.0",
+]
+
+[project.scripts]
+flyquant = "flyquant.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/GeneralKnowledge/FlyQuant"
+Upstream = "https://github.com/vaibhavkedarisetti/fruit-fly-lab"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "integration: needs full FlyWire web connectome (~26 MB assets, more RAM)",
+  "slow: longer simulations",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.flyquant]
+upstream_commit = "26672e06427c12c61536ce1bd93dae7442944681"
+dataset = "FlyWire FAFB v783"
