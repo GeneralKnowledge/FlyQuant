@@ -1,0 +1,49 @@
+# Quickstart suite: runs on CPU with the escape-circuit subgraph (~4k neurons).
+# Uses web connectome assets from the fruit-fly-lab submodule (no Codex login).
+#
+#   flyquant suite experiments/quickstart_subgraph.yaml
+#   flyquant report
+
+runs:
+  - name: ref_escape_subgraph
+    method: reference
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    execution_dtype: fp32
+
+  - name: fp16_escape_subgraph
+    method: fp16
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    native_fp16_execution: true
+
+  - name: int8_escape_subgraph
+    method: int8
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+
+  - name: lossless_graph_escape_subgraph
+    method: lossless_graph
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    gzip: true

@@ -1,0 +1,41 @@
+# Unit-scale smoke suite using a synthetic graph (no FlyWire assets required).
+runs:
+  - name: synth_ref
+    method: reference
+    experiment: escape_subgraph
+    connectome_source: synthetic
+    subgraph: null
+    seed: 0
+    duration_ms: 20
+    rate_hz: 200
+    min_ram_gb: 0
+
+  - name: synth_fp16
+    method: fp16
+    experiment: escape
+    connectome_source: synthetic
+    subgraph: null
+    seed: 0
+    duration_ms: 20
+    rate_hz: 200
+    min_ram_gb: 0
+
+  - name: synth_int8
+    method: int8
+    experiment: escape
+    connectome_source: synthetic
+    subgraph: null
+    seed: 0
+    duration_ms: 20
+    rate_hz: 200
+    min_ram_gb: 0
+
+  - name: synth_lossless
+    method: lossless_graph
+    experiment: escape
+    connectome_source: synthetic
+    subgraph: null
+    seed: 0
+    duration_ms: 20
+    rate_hz: 200
+    min_ram_gb: 0
