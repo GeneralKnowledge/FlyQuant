@@ -1,0 +1,21 @@
+# Full 139k-neuron short trials. Expect unexecuted on small hosts.
+runs:
+  - name: fullbrain_ref_short
+    method: reference
+    experiment: escape
+    connectome_source: web
+    subgraph: null
+    seed: 0
+    duration_ms: 20
+    rate_hz: 150
+    min_ram_gb: 6.0
+
+  - name: fullbrain_int8_short
+    method: int8
+    experiment: escape
+    connectome_source: web
+    subgraph: null
+    seed: 0
+    duration_ms: 20
+    rate_hz: 150
+    min_ram_gb: 6.0

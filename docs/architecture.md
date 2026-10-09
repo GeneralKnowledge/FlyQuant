@@ -44,5 +44,6 @@ A smaller file does not imply lower peak RSS or faster steps unless measured.
 ## Experiment progression
 
 Phases follow the project brief: audit → harness → lossless graph → FP16/INT8 →
-state precision → pruning → reports. Pruning is available but optional; it is
-kept independent of weight quantisation.
+state precision / INT4 packing / recording → looming adapters → pruning +
+pipelines → reports / CI. Pruning stays independent of weight quantisation
+unless explicitly composed via `method: pipeline`.

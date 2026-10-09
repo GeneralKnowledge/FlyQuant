@@ -1,0 +1,96 @@
+# Phase 6: fixed a-priori prune levels — NOT tuned on evaluation outcomes.
+# keep_fraction levels and synapse-count thresholds chosen before measuring.
+runs:
+  - name: prune_ref
+    method: reference
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+
+  - name: prune_keep_0.95
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: keep_fraction
+    prune_level: 0.95
+
+  - name: prune_keep_0.90
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: keep_fraction
+    prune_level: 0.90
+
+  - name: prune_keep_0.75
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: keep_fraction
+    prune_level: 0.75
+
+  - name: prune_keep_0.50
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: keep_fraction
+    prune_level: 0.50
+
+  - name: prune_threshold_5
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: threshold
+    prune_level: 5
+
+  - name: prune_importance_outdeg_0.90
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: importance_magnitude_outdegree
+    prune_level: 0.90
+
+  - name: prune_importance_dnp01_0.90
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: importance_dnp01_path
+    prune_level: 0.90

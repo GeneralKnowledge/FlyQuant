@@ -25,83 +25,70 @@ cd FlyQuant
 python -m pip install -e ".[dev]"
 
 flyquant inspect
-flyquant suite experiments/synthetic_smoke.yaml    # no FlyWire assets needed
-flyquant suite experiments/quickstart_subgraph.yaml  # uses submodule web/data
+flyquant suite experiments/synthetic_smoke.yaml
+flyquant suite experiments/quickstart_subgraph.yaml
+flyquant suite experiments/release_subgraph.yaml   # Phase 5–7 release surface
 flyquant report
 ```
-
-The synthetic suite always runs. The subgraph suite loads the real v783 wiring
-diagram from `reference/fruit-fly-lab/web/data/` (~26 MB) and benchmarks an
-escape-circuit neighbourhood (~4k neurons).
 
 ## CLI
 
 | Command | Purpose |
 |---|---|
-| `flyquant inspect` | Upstream commit, assets, available methods |
+| `flyquant inspect` | Upstream commit, assets, derived-data status |
 | `flyquant baseline --experiment escape_subgraph` | Reference measurements |
-| `flyquant compress --method fp16 --experiment escape_subgraph` | Lossy / lossless variant |
+| `flyquant compress --method state_fp16 --experiment escape_subgraph` | State / weight / prune / pipeline |
 | `flyquant verify --experiment escape_subgraph` | Lossless graph round-trip |
-| `flyquant benchmark --compare reference,fp16,int8,lossless_graph` | Paired comparisons |
-| `flyquant suite experiments/quickstart_subgraph.yaml` | Config-driven suite |
-| `flyquant report` | Markdown + JSON + plots under `reports/` |
+| `flyquant benchmark --compare reference,fp16,int8,int4,state_fp16` | Paired comparisons |
+| `flyquant suite experiments/release_subgraph.yaml` | Locked suite |
+| `flyquant report` | Markdown + JSON + CSV + plots under `reports/` |
 
-## What is implemented (v0.1)
+Common flags: `--execution-dtype {fp32,fp16,fp64}`, `--record-spikes`, `--record-v`.
 
-1. Upstream audit and pinned submodule (`docs/audit.md`)
-2. Immutable reference adapter + web-binary connectome loader
-3. Reproducible baseline harness (JSON results, cache fingerprints)
-4. Lossy weight quantisation: FP16, INT8, INT4 (ablation)
-5. Lossless graph encoding: CSR + delta indices + narrow ints + gzip
-6. Neural + behavioural fidelity metrics (silent / zero-variance safe)
-7. Optional magnitude pruning (independent of quantisation)
-8. Automated unit tests (synthetic) + optional `@pytest.mark.integration` tests
-9. Comparison report with Pareto listing
+## What is implemented (v0.2)
 
-## Project layout
+Phases 1–7 of the project brief, adapted to upstream:
 
-See `docs/architecture.md`. Compression never edits `reference/fruit-fly-lab`.
+1. Upstream audit + pinned submodule
+2. Benchmark harness with cache / RAM gates / `unexecuted` labels
+3. Lossless CSR + delta + gzip
+4. Weight quantisation FP16 / INT8 / INT4 (nibble-packed storage)
+5. State-precision isolation (`state_fp16` / `state_fp64`) + recording metrics
+6. Pruning (magnitude + static importance) and combined pipelines
+7. Release suites, richer reports (CSV + family plots), GitHub Actions CI
+8. Looming / lesion adapters (run or cleanly `unexecuted` without Codex data)
 
-## Data and licences
+## Locked suites
 
-- **FlyQuant code:** Apache-2.0
-- **FlyWire data:** CC BY-NC-SA 4.0 — obtain via Codex; see `docs/data-acquisition.md`
-- **fruit-fly-lab:** submodule; no LICENSE file upstream — do not relicense it
-
-Do not commit large FlyWire CSV dumps into git.
-
-## Full-brain upstream experiments
-
-After downloading Codex files and building the derived connectome:
-
-```bash
-export FLYWIRE_V783_DIR=/path/to/FlyWire\ Brain\ Dataset\ \(FAFB\ v783\)
-cd reference/fruit-fly-lab
-python -m brain.connectivity.build_connectome
-python -m experiments.02_escape_controls
-```
-
-Then point FlyQuant at `connectome_source: derived` (or `auto`).
+| File | Role |
+|---|---|
+| `experiments/release_subgraph.yaml` | Canonical CPU release |
+| `experiments/state_precision.yaml` | State vs weight FP16 |
+| `experiments/prune_ablation.yaml` | Fixed prune levels |
+| `experiments/pipeline_ablation.yaml` | Combined ablations |
+| `experiments/looming_derived.yaml` | Needs Codex-derived connectome |
+| `experiments/release_fullbrain.yaml` | Full brain, high RAM gate |
 
 ## Documentation
 
 | Doc | Contents |
 |---|---|
-| `docs/audit.md` | Upstream inspection findings |
+| `docs/audit.md` | Upstream inspection |
 | `docs/architecture.md` | Component boundaries |
 | `docs/methodology.md` | Metrics and protocols |
 | `docs/data-acquisition.md` | Legal data access |
 | `docs/limitations.md` | Assumptions and gaps |
+| `docs/baseline_results.md` | Measured / unexecuted status |
 
-## Citing the science (not this repo)
+## Data and licences
 
-- Dorkenwald et al. (2024) doi:10.1038/s41586-024-07558-y
-- Schlegel et al. (2024) doi:10.1038/s41586-024-07686-5
-- Shiu et al. (2024) doi:10.1038/s41586-024-07763-9
+- **FlyQuant code:** Apache-2.0
+- **FlyWire data:** CC BY-NC-SA 4.0 — see `docs/data-acquisition.md`
+- **fruit-fly-lab:** submodule; no LICENSE file upstream
 
 ## Tests
 
 ```bash
-pytest tests/ -q                 # unit tests (synthetic only)
-pytest tests/ -q -m integration  # needs submodule web/data
+pytest tests/ -q -m "not integration and not slow"   # CI default
+pytest tests/ -q -m "integration and not slow"       # needs web/data submodule
 ```

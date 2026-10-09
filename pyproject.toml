@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flyquant"
-version = "0.1.0"
+version = "0.2.0"
 description = "LLM-style quantisation experiments for a connectome-based fruit fly brain model"
 readme = "README.md"
 license = { text = "Apache-2.0" }

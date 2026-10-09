@@ -1,0 +1,89 @@
+# Canonical CPU release suite (Phase 7).
+runs:
+  - name: release_ref
+    method: reference
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+
+  - name: release_fp16
+    method: fp16
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    native_fp16_execution: true
+
+  - name: release_int8
+    method: int8
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+
+  - name: release_int4
+    method: int4
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    pack_int4: true
+
+  - name: release_state_fp16
+    method: state_fp16
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+
+  - name: release_lossless
+    method: lossless_graph
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    gzip: true
+
+  - name: release_prune_0.9
+    method: prune
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    prune_method: keep_fraction
+    prune_level: 0.9
+
+  - name: release_prune_then_int8
+    method: pipeline
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    steps:
+      - { op: prune, prune_method: keep_fraction, prune_level: 0.9 }
+      - { op: quantise, precision: int8 }
