@@ -1,6 +1,7 @@
-# Quickstart suite: CPU escape-circuit subgraph (~4k neurons) via web assets.
+# Phase 6: isolated vs combined prune/quant/lossless ablations.
+# Same seed/stimulus/reference for all rows.
 runs:
-  - name: ref_escape_subgraph
+  - name: pipe_ref
     method: reference
     experiment: escape_subgraph
     connectome_source: web
@@ -9,10 +10,9 @@ runs:
     duration_ms: 60
     rate_hz: 150
     min_ram_gb: 0
-    execution_dtype: fp32
 
-  - name: fp16_escape_subgraph
-    method: fp16
+  - name: pipe_prune_only
+    method: prune
     experiment: escape_subgraph
     connectome_source: web
     subgraph: escape
@@ -20,9 +20,10 @@ runs:
     duration_ms: 60
     rate_hz: 150
     min_ram_gb: 0
-    native_fp16_execution: true
+    prune_method: keep_fraction
+    prune_level: 0.9
 
-  - name: int8_escape_subgraph
+  - name: pipe_quant_only
     method: int8
     experiment: escape_subgraph
     connectome_source: web
@@ -32,8 +33,8 @@ runs:
     rate_hz: 150
     min_ram_gb: 0
 
-  - name: int4_escape_subgraph
-    method: int4
+  - name: pipe_prune_then_quant
+    method: pipeline
     experiment: escape_subgraph
     connectome_source: web
     subgraph: escape
@@ -41,9 +42,24 @@ runs:
     duration_ms: 60
     rate_hz: 150
     min_ram_gb: 0
-    pack_int4: true
+    steps:
+      - { op: prune, prune_method: keep_fraction, prune_level: 0.9 }
+      - { op: quantise, precision: int8 }
 
-  - name: lossless_graph_escape_subgraph
+  - name: pipe_quant_then_prune
+    method: pipeline
+    experiment: escape_subgraph
+    connectome_source: web
+    subgraph: escape
+    seed: 0
+    duration_ms: 60
+    rate_hz: 150
+    min_ram_gb: 0
+    steps:
+      - { op: quantise, precision: int8 }
+      - { op: prune, prune_method: keep_fraction, prune_level: 0.9 }
+
+  - name: pipe_lossless_only
     method: lossless_graph
     experiment: escape_subgraph
     connectome_source: web

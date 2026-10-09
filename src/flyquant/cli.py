@@ -14,14 +14,35 @@ from flyquant.paths import (
     META_JSON,
     NEURONS_BIN,
     REFERENCE_DIR,
-    REPORTS_DIR,
-    RESULTS_DIR,
     ensure_output_dirs,
 )
 
 
+def _add_common_run_args(s: argparse.ArgumentParser) -> None:
+    s.add_argument("--source", default="auto", choices=["auto", "web", "derived", "synthetic"])
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--duration-ms", type=float, default=80.0)
+    s.add_argument("--rate-hz", type=float, default=150.0)
+    s.add_argument(
+        "--execution-dtype",
+        default="fp32",
+        choices=["fp32", "fp16", "fp64"],
+        help="Runtime state dtype for v/g/ring (and wdata unless overridden)",
+    )
+    s.add_argument("--force", action="store_true", help="Ignore RAM gate")
+    s.add_argument("--no-cache", action="store_true")
+    s.add_argument("--record-spikes", action="store_true")
+    s.add_argument("--record-v", action="store_true", help="Sample membrane traces")
+
+
+def _subgraph_for_experiment(experiment: str) -> str | None:
+    if experiment == "escape_subgraph":
+        return "escape"
+    return None
+
+
 def cmd_inspect(_: argparse.Namespace) -> int:
-    from flyquant.reference.adapter import get_upstream_commit
+    from flyquant.reference.adapter import derived_data_status, get_upstream_commit
     from flyquant.reference.web_loader import estimate_web_load_bytes, web_assets_available
 
     print(f"FlyQuant {__version__}")
@@ -35,11 +56,19 @@ def cmd_inspect(_: argparse.Namespace) -> int:
         print(f"  neurons.bin:    {NEURONS_BIN} ({NEURONS_BIN.stat().st_size} bytes)")
         print(f"  meta.json:      {META_JSON} ({META_JSON.stat().st_size} bytes)")
         print(f"  approx file bytes: {estimate_web_load_bytes()}")
-    print("Available experiments (conceptual):")
-    print("  escape          — Poisson LC4/LPLC2 → DNp01 probe (FlyQuant harness)")
-    print("  escape_subgraph — same on ~4k-neuron escape neighbourhood")
-    print("  upstream_01     — full geometric looming (needs derived connectome)")
-    print("Compression methods: reference, fp16, int8, int4, lossless_graph, prune")
+    derived = derived_data_status()
+    print(f"Derived connectome available: {derived['available']}")
+    if not derived["available"]:
+        print(f"  reason: {derived['reason']}")
+    print("Available experiments:")
+    print("  escape / escape_poisson — Poisson LC4/LPLC2 → DNp01")
+    print("  escape_subgraph         — same on ~4k-neuron neighbourhood")
+    print("  looming                 — geometric looming (needs derived data)")
+    print("  escape_controls         — lesion controls (needs derived data)")
+    print(
+        "Methods: reference, fp16, int8, int4, state_fp16, state_fp64, "
+        "lossless_graph, prune, pipeline"
+    )
     return 0
 
 
@@ -47,31 +76,27 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     from flyquant.benchmarks.harness import BenchmarkHarness
 
     ensure_output_dirs()
-    subgraph = None
-    duration = args.duration_ms
-    source = args.source
+    experiment = args.experiment
+    subgraph = _subgraph_for_experiment(experiment)
     min_ram = 0.0
-    if args.experiment in ("escape", "escape_poisson"):
-        subgraph = None
+    if experiment in ("escape", "escape_poisson") and subgraph is None:
         min_ram = 3.5
-    elif args.experiment == "escape_subgraph":
-        subgraph = "escape"
-        duration = args.duration_ms or 80.0
-    else:
-        print(f"Unknown experiment '{args.experiment}'", file=sys.stderr)
-        return 2
+    if experiment in ("looming", "escape_controls"):
+        min_ram = 3.5
 
     cfg = {
-        "name": f"baseline_{args.experiment}",
+        "name": f"baseline_{experiment}",
         "method": "reference",
-        "experiment": args.experiment,
-        "connectome_source": source,
+        "experiment": experiment,
+        "connectome_source": args.source,
         "subgraph": subgraph,
         "seed": args.seed,
-        "duration_ms": duration,
+        "duration_ms": args.duration_ms,
         "rate_hz": args.rate_hz,
-        "min_ram_gb": min_ram if not args.force else 0.0,
-        "execution_dtype": "fp32",
+        "min_ram_gb": 0.0 if args.force else min_ram,
+        "execution_dtype": args.execution_dtype,
+        "record_spikes": args.record_spikes,
+        "record_v": args.record_v,
     }
     harness = BenchmarkHarness()
     rec = harness.run_config(cfg, use_cache=not args.no_cache)
@@ -83,7 +108,7 @@ def cmd_compress(args: argparse.Namespace) -> int:
     from flyquant.benchmarks.harness import BenchmarkHarness
 
     ensure_output_dirs()
-    subgraph = "escape" if args.experiment == "escape_subgraph" else None
+    subgraph = _subgraph_for_experiment(args.experiment)
     cfg = {
         "name": f"{args.method}_{args.experiment}",
         "method": args.method,
@@ -96,9 +121,22 @@ def cmd_compress(args: argparse.Namespace) -> int:
         "min_ram_gb": 0.0 if args.force or subgraph else 3.5,
         "gzip": True,
         "native_fp16_execution": True,
+        "pack_int4": True,
         "prune_method": args.prune_method,
         "prune_level": args.prune_level,
+        "execution_dtype": args.execution_dtype,
+        "record_spikes": args.record_spikes,
+        "record_v": args.record_v,
     }
+    if args.method == "pipeline":
+        cfg["steps"] = [
+            {
+                "op": "prune",
+                "prune_method": args.prune_method,
+                "prune_level": args.prune_level,
+            },
+            {"op": "quantise", "precision": "int8"},
+        ]
     harness = BenchmarkHarness()
     rec = harness.run_config(cfg, use_cache=not args.no_cache)
     print(json.dumps(rec.to_dict(), indent=2, default=str))
@@ -114,7 +152,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     )
     from flyquant.reference.adapter import load_reference_connectome
 
-    subgraph = "escape" if args.experiment == "escape_subgraph" else None
+    subgraph = _subgraph_for_experiment(args.experiment)
     c = load_reference_connectome(source=args.source, subgraph=subgraph)
     if args.artefact:
         art = load_graph_artefact(Path(args.artefact))
@@ -136,18 +174,25 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     else:
         variants = [v.strip() for v in args.compare.split(",") if v.strip()]
         records = []
+        subgraph = _subgraph_for_experiment(args.experiment)
         for name in variants:
-            method = "reference" if name in ("reference", "fp32", "baseline") else name
+            method = "reference" if name in ("reference", "baseline") else name
+            if name == "fp32":
+                method = "fp32"
             cfg = {
                 "name": f"bench_{name}",
-                "method": method if method != "fp32" else "fp32",
+                "method": method,
                 "experiment": args.experiment,
                 "connectome_source": args.source,
-                "subgraph": "escape" if args.experiment == "escape_subgraph" else None,
+                "subgraph": subgraph,
                 "seed": args.seed,
                 "duration_ms": args.duration_ms,
                 "rate_hz": args.rate_hz,
-                "min_ram_gb": 0.0 if args.force else (0.0 if args.experiment == "escape_subgraph" else 3.5),
+                "min_ram_gb": 0.0 if args.force or subgraph else 3.5,
+                "execution_dtype": args.execution_dtype,
+                "pack_int4": True,
+                "record_spikes": args.record_spikes,
+                "record_v": args.record_v,
             }
             records.append(harness.run_config(cfg, use_cache=not args.no_cache))
     payload = [r.to_dict() for r in records]
@@ -187,48 +232,65 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("inspect", help="Show upstream model and asset status")
     s.set_defaults(func=cmd_inspect)
 
+    exp_choices = [
+        "escape",
+        "escape_subgraph",
+        "escape_poisson",
+        "looming",
+        "escape_controls",
+    ]
+
     s = sub.add_parser("baseline", help="Run reference baseline experiment")
-    s.add_argument("--experiment", default="escape_subgraph",
-                   choices=["escape", "escape_subgraph", "escape_poisson"])
-    s.add_argument("--source", default="auto", choices=["auto", "web", "derived", "synthetic"])
-    s.add_argument("--seed", type=int, default=0)
-    s.add_argument("--duration-ms", type=float, default=80.0)
-    s.add_argument("--rate-hz", type=float, default=150.0)
-    s.add_argument("--force", action="store_true", help="Ignore RAM gate")
-    s.add_argument("--no-cache", action="store_true")
+    s.add_argument("--experiment", default="escape_subgraph", choices=exp_choices)
+    _add_common_run_args(s)
     s.set_defaults(func=cmd_baseline)
 
     s = sub.add_parser("compress", help="Create/evaluate a compressed variant")
-    s.add_argument("--method", required=True,
-                   choices=["fp16", "fp32", "int8", "int4", "lossless_graph", "prune"])
-    s.add_argument("--experiment", default="escape_subgraph")
-    s.add_argument("--source", default="auto", choices=["auto", "web", "derived", "synthetic"])
-    s.add_argument("--seed", type=int, default=0)
-    s.add_argument("--duration-ms", type=float, default=80.0)
-    s.add_argument("--rate-hz", type=float, default=150.0)
-    s.add_argument("--prune-method", default="keep_fraction",
-                   choices=["threshold", "percentile", "keep_fraction"])
+    s.add_argument(
+        "--method",
+        required=True,
+        choices=[
+            "fp16",
+            "fp32",
+            "int8",
+            "int4",
+            "state_fp16",
+            "state_fp64",
+            "lossless_graph",
+            "prune",
+            "pipeline",
+        ],
+    )
+    s.add_argument("--experiment", default="escape_subgraph", choices=exp_choices)
+    s.add_argument(
+        "--prune-method",
+        default="keep_fraction",
+        choices=[
+            "threshold",
+            "percentile",
+            "keep_fraction",
+            "importance_magnitude_outdegree",
+            "importance_dnp01_path",
+        ],
+    )
     s.add_argument("--prune-level", type=float, default=0.9)
-    s.add_argument("--force", action="store_true")
-    s.add_argument("--no-cache", action="store_true")
+    _add_common_run_args(s)
     s.set_defaults(func=cmd_compress)
 
     s = sub.add_parser("verify", help="Verify lossless graph round-trip")
-    s.add_argument("--experiment", default="escape_subgraph")
+    s.add_argument("--experiment", default="escape_subgraph", choices=exp_choices)
     s.add_argument("--source", default="auto", choices=["auto", "web", "derived", "synthetic"])
     s.add_argument("--artefact", default=None, help="Path to graph .json meta")
     s.set_defaults(func=cmd_verify)
 
     s = sub.add_parser("benchmark", help="Compare variants against reference")
-    s.add_argument("--compare", default="reference,fp16,int8,lossless_graph")
+    s.add_argument(
+        "--compare",
+        default="reference,fp16,int8,int4,state_fp16,lossless_graph",
+    )
     s.add_argument("--suite", default=None)
-    s.add_argument("--experiment", default="escape_subgraph")
-    s.add_argument("--source", default="auto", choices=["auto", "web", "derived", "synthetic"])
-    s.add_argument("--seed", type=int, default=0)
-    s.add_argument("--duration-ms", type=float, default=80.0)
-    s.add_argument("--rate-hz", type=float, default=150.0)
-    s.add_argument("--force", action="store_true")
-    s.add_argument("--no-cache", action="store_true")
+    s.add_argument("--experiment", default="escape_subgraph", choices=exp_choices)
+    _add_common_run_args(s)
     s.set_defaults(func=cmd_benchmark)
 
     s = sub.add_parser("suite", help="Run a YAML experiment suite")

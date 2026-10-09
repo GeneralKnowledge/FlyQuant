@@ -1,0 +1,20 @@
+# Geometric looming + lesion controls. Requires Codex-derived connectome.
+# Without FLYWIRE_V783_DIR + build_connectome, runs are labelled unexecuted.
+runs:
+  - name: looming_ref
+    method: reference
+    experiment: looming
+    connectome_source: derived
+    subgraph: null
+    seed: 0
+    duration_ms: 280
+    min_ram_gb: 3.5
+
+  - name: escape_controls_ref
+    method: reference
+    experiment: escape_controls
+    connectome_source: derived
+    subgraph: null
+    seed: 0
+    duration_ms: 240
+    min_ram_gb: 3.5

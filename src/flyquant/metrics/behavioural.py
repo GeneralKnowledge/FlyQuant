@@ -1,4 +1,4 @@
-"""Behavioural / circuit-level fidelity for escape-style probes."""
+"""Behavioural / circuit-level fidelity for escape-style probes and lesions."""
 
 from __future__ import annotations
 
@@ -49,5 +49,72 @@ def behavioural_fidelity(ref: dict, hyp: dict) -> dict[str, Any]:
         "caveat": (
             "Matching the simulator does not prove equivalence to a living fly; "
             "scores measure fidelity to the selected computational model."
+        ),
+    }
+
+
+def lesion_control_fidelity(ref_conditions: list[dict], hyp_conditions: list[dict]) -> dict[str, Any]:
+    """
+    Compare escape-control condition tables.
+
+    Expects each condition dict to include at least:
+      condition, dnp01_spikes (or gf_spikes), silenced (optional list)
+    """
+    def _key(c: dict) -> str:
+        return str(c.get("condition", ""))
+
+    def _gf(c: dict) -> int:
+        if "dnp01_spikes" in c:
+            return int(c["dnp01_spikes"])
+        return int(c.get("gf_spikes", 0))
+
+    ref_map = {_key(c): c for c in ref_conditions}
+    hyp_map = {_key(c): c for c in hyp_conditions}
+    keys = sorted(set(ref_map) | set(hyp_map))
+    rows = []
+    abolishment_ok = None
+    for k in keys:
+        r = ref_map.get(k)
+        h = hyp_map.get(k)
+        if r is None or h is None:
+            rows.append({"condition": k, "missing": True})
+            continue
+        rg, hg = _gf(r), _gf(h)
+        row = {
+            "condition": k,
+            "ref_gf": rg,
+            "hyp_gf": hg,
+            "gf_abs_error": abs(hg - rg),
+            "both_silent": rg == 0 and hg == 0,
+            "both_active": rg > 0 and hg > 0,
+            "agreement_success": (rg > 0) == (hg > 0),
+        }
+        rows.append(row)
+        if "LC4" in k and "LPLC2" in k and ("-" in k or "silence" in k.lower()):
+            # Lesion abolishment: both should be ~0
+            abolishment_ok = (rg == 0) and (hg == 0)
+        elif k.endswith("-LC4/-LPLC2") or "-both" in k or k.endswith(", -LC4/-LPLC2"):
+            abolishment_ok = (rg == 0) and (hg == 0)
+
+    # Also detect silenced both via silenced field
+    if abolishment_ok is None:
+        for k, r in ref_map.items():
+            sil = r.get("silenced") or []
+            if set(sil) >= {"LC4", "LPLC2"}:
+                h = hyp_map.get(k)
+                if h is not None:
+                    abolishment_ok = (_gf(r) == 0) and (_gf(h) == 0)
+
+    n_agree = sum(1 for r in rows if r.get("agreement_success") is True)
+    n_cmp = sum(1 for r in rows if "agreement_success" in r)
+    return {
+        "n_conditions": len(keys),
+        "n_compared": n_cmp,
+        "success_agreement_fraction": (n_agree / n_cmp) if n_cmp else None,
+        "lesion_abolishment_agreement": abolishment_ok,
+        "rows": rows,
+        "caveat": (
+            "Lesion abolishment agreement requires GF≈0 under LC4+LPLC2 silence "
+            "on both reference and compressed models."
         ),
     }

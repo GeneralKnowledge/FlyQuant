@@ -11,6 +11,10 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from typing import Any, Iterator
 
+import numpy as np
+
+from flyquant.compression.state import estimate_state_bytes
+
 
 @dataclass
 class ResourceSnapshot:
@@ -44,6 +48,32 @@ def measure_resources() -> ResourceSnapshot:
         cpu_count=os.cpu_count(),
         notes="ru_maxrss is process peak RSS; device/GPU memory N/A (CPU-only engine).",
     )
+
+
+def engine_state_footprint(engine) -> dict[str, Any]:
+    """
+    Measure in-memory footprint of dynamic state arrays on a live engine.
+
+    Separates CSR / weight storage from v, g, and the synaptic delay ring.
+    """
+    v_b = int(getattr(engine, "v").nbytes)
+    g_b = int(getattr(engine, "g").nbytes)
+    ring_b = int(getattr(engine, "_ring").nbytes)
+    wdata_b = int(getattr(engine, "wdata").nbytes)
+    estimated = estimate_state_bytes(
+        n_neurons=int(engine.n),
+        delay_slots=int(engine._ring.shape[0]),
+        dtype=engine.dtype,
+    )
+    return {
+        "dtype": str(np.dtype(engine.dtype)),
+        "v_bytes": v_b,
+        "g_bytes": g_b,
+        "ring_bytes": ring_b,
+        "wdata_bytes": wdata_b,
+        "state_arrays_bytes": v_b + g_b + ring_b,
+        "estimated": estimated,
+    }
 
 
 @contextmanager
